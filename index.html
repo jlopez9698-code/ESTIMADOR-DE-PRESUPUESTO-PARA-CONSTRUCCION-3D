@@ -1,0 +1,742 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Estimador de construcción con visualización 3D interactiva.">
+<title>Estimador de Construcción 3D</title>
+
+<style>
+:root {
+  --bg: #f2f5f8;
+  --card: #ffffff;
+  --ink: #182230;
+  --muted: #64748b;
+  --blue: #1769aa;
+  --line: #e2e8f0;
+}
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+header {
+  padding: 28px 20px;
+  background: linear-gradient(130deg, #0f2942, #1769aa);
+  color: white;
+}
+.head {
+  max-width: 1180px;
+  margin: auto;
+}
+h1 { margin: 0 0 8px; }
+header p { margin: 0; color: #dceafa; }
+
+main {
+  max-width: 1180px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, .85fr) minmax(0, 1.35fr);
+  gap: 18px;
+  align-items: start;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 8px 28px #102a4309;
+}
+h2 { font-size: 1.15rem; margin: 0 0 16px; }
+h3 { font-size: 1rem; margin: 20px 0 12px; }
+
+label {
+  display: block;
+  font-weight: 600;
+  font-size: .9rem;
+  margin-bottom: 7px;
+}
+.field { margin-bottom: 14px; }
+
+input, select {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font: inherit;
+  background: white;
+}
+.levels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.level {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+}
+.level:has(input:checked) {
+  border-color: var(--blue);
+  background: #eef7ff;
+}
+.level input { width: auto; }
+.level strong, .level small { display: block; }
+.level strong { margin-top: 5px; }
+.level small { margin-top: 5px; color: var(--muted); }
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 15px;
+  background: var(--blue);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:hover { filter: brightness(.94); }
+button.secondary { background: #eaf1f7; color: #183b59; }
+.actions { display: flex; gap: 8px; margin-top: 16px; }
+.actions button { flex: 1; }
+
+.viewer { padding: 0; overflow: hidden; }
+.viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.viewer-head h2 { margin: 0; }
+
+#scene {
+  display: block;
+  width: 100%;
+  height: 410px;
+  background: linear-gradient(#eaf5ff, #f7fafc 72%, #e5edf4);
+  touch-action: none;
+  cursor: grab;
+}
+#scene:active { cursor: grabbing; }
+
+.hint, .scene-note, .notice {
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.5;
+}
+.scene-note { padding: 0 20px 16px; }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.metric {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px;
+  min-width: 0;
+}
+.metric span {
+  display: block;
+  color: var(--muted);
+  font-size: .78rem;
+  margin-bottom: 6px;
+}
+.metric strong {
+  display: block;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.total {
+  margin-top: 12px;
+  background: linear-gradient(135deg, #123b5d, #1769aa);
+  color: white;
+  border-radius: 14px;
+  padding: 18px;
+}
+.total span { font-size: .85rem; }
+.total strong {
+  display: block;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  margin: 7px 0;
+}
+.total p { font-size: .8rem; line-height: 1.5; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+th { color: #475569; background: #f8fafc; }
+td:last-child, th:last-child { text-align: right; }
+
+footer {
+  text-align: center;
+  padding: 20px;
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+@media(max-width: 850px) {
+  .layout { grid-template-columns: 1fr; }
+  #scene { height: 360px; }
+}
+@media(max-width: 520px) {
+  .metrics, .levels { grid-template-columns: 1fr; }
+  .viewer-head { align-items: flex-start; flex-direction: column; }
+  #scene { height: 300px; }
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="head">
+    <h1>Estimador de Construcción 3D</h1>
+    <p>Explora el volumen de una vivienda y calcula un presupuesto preliminar.</p>
+  </div>
+</header>
+
+<main>
+<div class="layout">
+
+<section>
+  <div class="card">
+    <h2>Datos del proyecto</h2>
+
+    <div class="field">
+      <label for="area">Área construida (m²)</label>
+      <input id="area" type="number" min="20" max="1000" value="120">
+      <p class="hint">Área total construida de referencia.</p>
+    </div>
+
+    <div class="field">
+      <label for="floors">Número de pisos</label>
+      <select id="floors">
+        <option value="1">1 piso</option>
+        <option value="2" selected>2 pisos</option>
+        <option value="3">3 pisos</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="shape">Forma general</label>
+      <select id="shape">
+        <option value="rect">Rectangular</option>
+        <option value="l">En L</option>
+        <option value="u">En U</option>
+      </select>
+    </div>
+
+    <h3>Nivel de construcción</h3>
+    <div class="levels">
+      <label class="level">
+        <input type="radio" name="level" value="sencillo" checked>
+        <strong>Sencillo</strong>
+        <small>$2.500.000/m²</small>
+      </label>
+      <label class="level">
+        <input type="radio" name="level" value="moderado">
+        <strong>Moderado</strong>
+        <small>$3.500.000/m²</small>
+      </label>
+      <label class="level">
+        <input type="radio" name="level" value="lujo">
+        <strong>Lujo</strong>
+        <small>$5.000.000/m²</small>
+      </label>
+    </div>
+
+    <h3>Costos adicionales</h3>
+    <div class="field">
+      <label for="contingency">Imprevistos (%)</label>
+      <input id="contingency" type="number" min="0" max="100" step="0.5" value="5">
+    </div>
+    <div class="field">
+      <label for="design">Diseño y estudios (%)</label>
+      <input id="design" type="number" min="0" max="100" step="0.5" value="4">
+    </div>
+    <div class="field">
+      <label for="aiu">AIU (%)</label>
+      <input id="aiu" type="number" min="0" max="100" step="0.5" value="10">
+    </div>
+
+    <div class="actions">
+      <button id="updateBtn" type="button">Actualizar</button>
+      <button id="resetBtn" class="secondary" type="button">Restablecer</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Cómo usar la vista 3D</h2>
+    <p class="notice">
+      Arrastra sobre el modelo para girarlo. Usa la rueda del ratón
+      para acercar o alejar. Cambia el área, los pisos y la forma
+      para actualizar la representación conceptual.
+    </p>
+    <p class="notice">
+      Este modelo no representa planos arquitectónicos, estructura,
+      distribución interior ni un diseño apto para construir.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="card viewer">
+    <div class="viewer-head">
+      <h2>Vista 3D interactiva</h2>
+      <button id="homeView" class="secondary" type="button">Restablecer cámara</button>
+    </div>
+    <canvas id="scene" aria-label="Modelo 3D conceptual de vivienda"></canvas>
+    <div class="scene-note">Modelo volumétrico · Arrastra para rotar · Rueda para zoom</div>
+  </div>
+
+  <div class="card">
+    <h2>Resumen del presupuesto</h2>
+    <div class="metrics">
+      <div class="metric">
+        <span>Área construida</span>
+        <strong id="outArea">120 m²</strong>
+      </div>
+      <div class="metric">
+        <span>Nivel</span>
+        <strong id="outLevel">Sencillo</strong>
+      </div>
+      <div class="metric">
+        <span>Precio base por m²</span>
+        <strong id="outPrice">$2.500.000</strong>
+      </div>
+    </div>
+    <div class="total">
+      <span>Presupuesto estimado total</span>
+      <strong id="outTotal">$357.000.000</strong>
+      <p id="outBreakdown"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Distribución referencial del costo base</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Capítulo</th><th>Porcentaje</th><th>Valor estimado</th></tr>
+        </thead>
+        <tbody id="chapters"></tbody>
+      </table>
+    </div>
+    <p class="hint">Porcentajes referenciales aplicados al costo base.</p>
+  </div>
+
+  <div class="card">
+    <h2>Comparación por nivel</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Nivel</th><th>Precio/m²</th><th>Costo base</th><th>Total con adicionales</th></tr>
+        </thead>
+        <tbody id="comparison"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+</div>
+</main>
+
+<footer>Estimador académico de construcción · Valores de referencia · COP</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  const prices = {
+    sencillo: 2500000,
+    moderado: 3500000,
+    lujo: 5000000
+  };
+
+  const names = {
+    sencillo: "Sencillo",
+    moderado: "Moderado",
+    lujo: "Lujo"
+  };
+
+  const chapterData = [
+    ["Preliminares y cimentación", 10],
+    ["Estructura", 20],
+    ["Mampostería y pañetes", 12],
+    ["Cubierta e impermeabilización", 8],
+    ["Instalaciones eléctricas", 8],
+    ["Instalaciones hidrosanitarias", 8],
+    ["Pisos, enchapes y acabados", 18],
+    ["Carpinterías, puertas y ventanas", 8],
+    ["Pintura y detalles finales", 5],
+    ["Obras exteriores", 3]
+  ];
+
+  const $ = id => document.getElementById(id);
+  const canvas = $("scene");
+  const ctx = canvas.getContext("2d");
+
+  let yaw = -0.55;
+  let pitch = 0.38;
+  let zoom = 1;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  const money = n => n.toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0
+  });
+
+  function selectedLevel() {
+    return document.querySelector('input[name="level"]:checked').value;
+  }
+
+  function getModel() {
+    const area = Math.max(20, Math.min(1000, Number($("area").value) || 120));
+    const floors = Number($("floors").value) || 1;
+    const shape = $("shape").value;
+    const level = selectedLevel();
+    const price = prices[level];
+
+    const contingency = Math.max(0, Math.min(100, Number($("contingency").value) || 0));
+    const design = Math.max(0, Math.min(100, Number($("design").value) || 0));
+    const aiu = Math.max(0, Math.min(100, Number($("aiu").value) || 0));
+
+    const base = area * price;
+    const c = base * contingency / 100;
+    const d = base * design / 100;
+    const a = base * aiu / 100;
+
+    return {
+      area, floors, shape, level, price,
+      contingency, design, aiu, base, c, d, a,
+      total: base + c + d + a
+    };
+  }
+
+  function updateBudget(m) {
+    $("outArea").textContent = `${m.area.toLocaleString("es-CO")} m²`;
+    $("outLevel").textContent = names[m.level];
+    $("outPrice").textContent = money(m.price);
+    $("outTotal").textContent = money(m.total);
+
+    $("outBreakdown").textContent =
+      `Base ${money(m.base)} + imprevistos ${money(m.c)} + diseño/estudios ${money(m.d)} + AIU ${money(m.a)}.`;
+
+    $("chapters").innerHTML = chapterData.map(([name, pct]) =>
+      `<tr><td>${name}</td><td>${pct}%</td><td>${money(m.base * pct / 100)}</td></tr>`
+    ).join("");
+
+    $("comparison").innerHTML = Object.keys(prices).map(level => {
+      const base = m.area * prices[level];
+      const total = base * (1 + (m.contingency + m.design + m.aiu) / 100);
+
+      return `<tr>
+        <td>${names[level]}</td>
+        <td>${money(prices[level])}</td>
+        <td>${money(base)}</td>
+        <td>${money(total)}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // Proyección 3D dibujada en Canvas: no requiere librerías externas.
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawScene();
+  }
+
+  function project(x, y, z, scale, cx, cy) {
+    const cyaw = Math.cos(yaw);
+    const syaw = Math.sin(yaw);
+    const cp = Math.cos(pitch);
+    const sp = Math.sin(pitch);
+
+    const xr = x * cyaw - y * syaw;
+    const yr = x * syaw + y * cyaw;
+    const yr2 = yr * cp - z * sp;
+    const zr2 = yr * sp + z * cp;
+
+    return {
+      x: cx + xr * scale,
+      y: cy + yr2 * scale - zr2 * scale
+    };
+  }
+
+  function polygon(points, fill, stroke = "#52677a") {
+    ctx.beginPath();
+
+    points.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  function drawBlock(x0, y0, x1, y1, zTop, P) {
+    polygon([
+      P(x0,y0,0), P(x1,y0,0),
+      P(x1,y0,zTop), P(x0,y0,zTop)
+    ], "#d9e4ec");
+
+    polygon([
+      P(x1,y0,0), P(x1,y1,0),
+      P(x1,y1,zTop), P(x1,y0,zTop)
+    ], "#aebfce");
+
+    polygon([
+      P(x0,y0,zTop), P(x1,y0,zTop),
+      P(x1,y1,zTop), P(x0,y1,zTop)
+    ], "#eef3f7");
+  }
+
+  function drawScene() {
+    if (!ctx || !canvas.width) return;
+
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const m = getModel();
+    const cx = w * 0.51;
+    const groundY = h * 0.72;
+    const scale = Math.min(w / 10, h / 6) * zoom;
+
+    // Cuadrícula del terreno.
+    ctx.save();
+    ctx.strokeStyle = "#d6e1ea";
+    ctx.lineWidth = 1;
+
+    for (let i = -8; i <= 8; i++) {
+      const a = project(i, -8, 0, scale * 0.55, cx, groundY);
+      const b = project(i, 8, 0, scale * 0.55, cx, groundY);
+      const c = project(-8, i, 0, scale * 0.55, cx, groundY);
+      const d = project(8, i, 0, scale * 0.55, cx, groundY);
+
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(d.x, d.y);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    const footprint = Math.sqrt(m.area / m.floors);
+    const sx = Math.max(1.7, Math.min(3.5, footprint / 5.5));
+    const sy = Math.max(1.5, Math.min(3.0, footprint / 6.5));
+    const zTop = m.floors * 1.15;
+
+    const x0 = -sx / 2;
+    const x1 = sx / 2;
+    const y0 = -sy / 2;
+    const y1 = sy / 2;
+
+    const P = (x, y, z) => project(x, y, z, scale, cx, groundY);
+
+    // Volumen principal: rectangular, en L o en U.
+    if (m.shape === "rect") {
+      drawBlock(x0, y0, x1, y1, zTop, P);
+    } else if (m.shape === "l") {
+      drawBlock(x0, y0, x0 + sx * 0.58, y1, zTop, P);
+      drawBlock(x0, y0, x1, y0 + sy * 0.42, zTop, P);
+    } else {
+      drawBlock(x0, y0, x0 + sx * 0.32, y1, zTop, P);
+      drawBlock(x1 - sx * 0.32, y0, x1, y1, zTop, P);
+      drawBlock(x0, y0, x1, y0 + sy * 0.32, zTop, P);
+    }
+
+    // Líneas horizontales para indicar los pisos.
+    for (let f = 1; f < m.floors; f++) {
+      const z = f * 1.15;
+      const a = P(x0, y0, z);
+      const b = P(x1, y0, z);
+
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = "#8fa4b6";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Ventanas y puerta frontales.
+    const winColor =
+      m.level === "lujo" ? "#4b849f" :
+      m.level === "moderado" ? "#76a9bd" : "#b5d4df";
+
+    for (let f = 0; f < m.floors; f++) {
+      const z = f * 1.15 + 0.38;
+
+      for (let k = 0; k < 3; k++) {
+        const x = x0 + (k + 0.55) * (sx / 3);
+
+        polygon([
+          P(x - 0.18, y0 - 0.01, z),
+          P(x + 0.18, y0 - 0.01, z),
+          P(x + 0.18, y0 - 0.01, z + 0.34),
+          P(x - 0.18, y0 - 0.01, z + 0.34)
+        ], winColor, "#ffffff");
+      }
+
+      if (f === 0) {
+        const doorX = x0 + sx * 0.17;
+
+        polygon([
+          P(doorX, y0 - 0.02, 0.02),
+          P(doorX + 0.25, y0 - 0.02, 0.02),
+          P(doorX + 0.25, y0 - 0.02, 0.65),
+          P(doorX, y0 - 0.02, 0.65)
+        ], "#805c43", "#684832");
+      }
+    }
+
+    // Información del modelo.
+    ctx.fillStyle = "#24435e";
+    ctx.font = "600 13px Arial";
+    const shapeName =
+      m.shape === "rect" ? "Rectangular" :
+      m.shape === "l" ? "En L" : "En U";
+
+    ctx.fillText(`${m.floors} piso(s) · Forma ${shapeName}`, 18, 26);
+
+    ctx.fillStyle = "#60758a";
+    ctx.font = "12px Arial";
+    ctx.fillText(`${m.area} m² · Modelo conceptual`, 18, 46);
+  }
+
+  function updateAll() {
+    const model = getModel();
+    updateBudget(model);
+    drawScene();
+  }
+
+  $("updateBtn").addEventListener("click", updateAll);
+
+  ["area", "floors", "shape", "contingency", "design", "aiu"].forEach(id => {
+    $(id).addEventListener("input", updateAll);
+    $(id).addEventListener("change", updateAll);
+  });
+
+  document.querySelectorAll('input[name="level"]').forEach(el => {
+    el.addEventListener("change", updateAll);
+  });
+
+  $("resetBtn").addEventListener("click", () => {
+    $("area").value = 120;
+    $("floors").value = "2";
+    $("shape").value = "rect";
+    $("contingency").value = 5;
+    $("design").value = 4;
+    $("aiu").value = 10;
+
+    document.querySelector('input[name="level"][value="sencillo"]').checked = true;
+
+    yaw = -0.55;
+    pitch = 0.38;
+    zoom = 1;
+
+    updateAll();
+  });
+
+  $("homeView").addEventListener("click", () => {
+    yaw = -0.55;
+    pitch = 0.38;
+    zoom = 1;
+    drawScene();
+  });
+
+  canvas.addEventListener("pointerdown", e => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener("pointermove", e => {
+    if (!dragging) return;
+
+    yaw += (e.clientX - lastX) * 0.008;
+
+    pitch = Math.max(
+      -0.15,
+      Math.min(1.15, pitch + (e.clientY - lastY) * 0.006)
+    );
+
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    drawScene();
+  });
+
+  canvas.addEventListener("pointerup", () => dragging = false);
+  canvas.addEventListener("pointercancel", () => dragging = false);
+
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+
+    zoom = Math.max(
+      0.55,
+      Math.min(1.8, zoom * (e.deltaY < 0 ? 1.08 : 0.92))
+    );
+
+    drawScene();
+  }, { passive: false });
+
+  window.addEventListener("resize", resizeCanvas);
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawScene();
+  }
+
+  resizeCanvas();
+  updateAll();
+})();
+</script>
+</body>
+</html>
